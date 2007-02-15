@@ -1,5 +1,5 @@
 CFLAGS = -O2 -Wall -Wno-parentheses -Wno-switch -Wstrict-prototypes -Werror-implicit-function-declaration -Wpointer-arith \
-	-Wmissing-prototypes -Wmissing-declarations -Wcomments -Wextra -Wall -Werror -pedantic -ansi
+	-Wmissing-prototypes -Wmissing-declarations -Wcomments -Wextra -Wall -pedantic -ansi
 
 all: shownum
 
