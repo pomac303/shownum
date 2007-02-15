@@ -17,4 +17,4 @@ release: clean
 	cp shownum.c LICENSE README Makefile shownum
 	tar -czvf shownum.tar.gz shownum
 	rm -rf shownum
-	echo "upload shownum.tar.gz somewhere.."
+	@echo "upload shownum.tar.gz somewhere.."
