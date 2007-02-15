@@ -1,0 +1,26 @@
+version 1.3
+	* merged in changes from Ian Kumlien to add 64-bit support 
+
+version 1.4
+	* merged in changes from Ian Kumlien to format chars properly 
+
+version 1.5
+	* changed %L to %ll because Apple sucks. Many thanks to JC for finding out 
+
+version 1.6
+	* fixed junk being displayed after the ascii value 
+
+version 1.7
+	Changes from Ian Kumlien:
+		* Reworked the main code part to handle dynamic length numbers, 
+			it will now only display the "bytes" used.
+		* Some code cleanups and reworking.
+		* Switched to using 64bit datatypes due to enhanced restrictions
+			with the compiler flags.
+		* Now indicates nibbles with + and bytes with ^
+		* Now displays the octal value as well if someone wants to know.
+		* Removed -Werror since -ansi causes a warning on Mac OS X
+			since they define PRIu64 using a q qualifier that is
+			not ansi.
+		* Added MSVC C99 compability from JC
+
