@@ -81,10 +81,10 @@ int main(int argc, char **argv)
 	if (argc == 2)
 	{
 		mode_t mode	= MODE_DEC;
-		int	neg			= FALSE,
+		int	neg		= FALSE,
 			no_bytes	= 0,
-			index		= 0;
-		uint64_t val, bit;
+			index	= 0;
+		uint64_t val = 0, bit = 0;
 
 		char	buf[65], 
 				*p = argv[1];
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 				mode = MODE_BIN;
 		}
 
-		while (*(++p))
+		while (*(p++))
 		{
 			if (mode == MODE_BIN)
 			{
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
 		 * Now do the conversion.
 		 */
 		if (mode == MODE_HEX)
-			sscanf(argv[1], "%"PRIx64, &val);
+			(void)sscanf(argv[1], "%"PRIx64, &val);
 		else if (mode == MODE_ASCII)
 		{
 			bit = 0;	
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 				val = ~val;
 		}
 		else
-			sscanf(argv[1], "%"PRIu64, &val);
+			(void)sscanf(argv[1], "%"PRIu64, &val);
 
 		/*
 		 * How many bytes of information do we have?
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
 		 */
 		for (p = buf, index = (no_bytes -1) << 3; index > -1; index -= 8, p++)
 		{
-			if (!isprint((*p = ((((uint64_t)0xff << index)) & val) >> index)))
+			if (!isprint((*p = (char)((((uint64_t)0xff << index)) & val) >> index)))
 				*p = '.';
 			if (index == 32)
 			{
