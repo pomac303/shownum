@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 				mode = MODE_BIN;
 		}
 
-		while (*(p++))
+		while (*(++p))
 		{
 			if (mode == MODE_BIN)
 			{
