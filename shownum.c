@@ -86,8 +86,7 @@ int main(int argc, char **argv)
 			index	= 0;
 		uint64_t val = 0, bit = 0;
 
-		char	buf[65], 
-				*p = argv[1];
+		char	buf[65], *p = argv[1];
 
 		/*
 		 * Check for negative numbers.
@@ -154,14 +153,20 @@ int main(int argc, char **argv)
 			(void)sscanf(argv[1], "%"PRIx64, &val);
 		else if (mode == MODE_ASCII)
 		{
-			bit = 0;	
+			bit = 0;
+
+			if (p - argv[1] > 8)
+				p = argv[1] + 8;
 
 			for (val = 0; p >= argv[1] && bit < 64; bit += 8)
 				val += ((uint64_t)*(--p) << bit);
 		}
 		else if (mode == MODE_BIN)
 		{
-			char chr = 0;
+			register char chr = 0;
+
+			if (p - argv[1] > 64)
+				p = argv[1] + 64;
 
 			bit = 1;
 			val = 0;
@@ -199,7 +204,7 @@ int main(int argc, char **argv)
 		 */
 		for (p = buf, index = (no_bytes -1) << 3; index > -1; index -= 8, p++)
 		{
-			if (!isprint((*p = (char)((((uint64_t)0xff << index)) & val) >> index)))
+			if (!isprint((*p = (char)((((uint64_t)0xff << index) & val) >> index))))
 				*p = '.';
 			if (index == 32)
 			{
@@ -213,21 +218,18 @@ int main(int argc, char **argv)
 		printf(	"Number of bits used: %i (%i bytes)\n"
 				"Dec: %-22"PRIu64, no_bytes << 3, no_bytes, val);
 		if (GET_HI(val))
-			printf( " --- hi: %-11"PRIu64" lo: %"PRIu64"\n", GET_HI(val), GET_LO(val));
-		else
-			printf(	"\n");
+			printf( " --- hi: %-11"PRIu64" lo: %"PRIu64, GET_HI(val), GET_LO(val));
+		printf("\n");
 
 		printf(	"Hex: 0x%-20"PRIx64, val);
 		if (GET_HI(val))
-			printf(	" --- hi: 0x%-9"PRIx64" lo: 0x%"PRIx64"\n", GET_HI(val), GET_LO(val));
-		else
-			printf(	"\n");
+			printf(	" --- hi: 0x%-9"PRIx64" lo: 0x%"PRIx64, GET_HI(val), GET_LO(val));
+		printf("\n");
 
 		printf(	"Oct: %-22"PRIo64, val);
 		if (GET_HI(val))
-			printf(	" --- hi: %-11"PRIo64" lo: %"PRIo64"\n", GET_HI(val), GET_LO(val));
-		else
-			printf( "\n");
+			printf(	" --- hi: %-11"PRIo64" lo: %"PRIo64, GET_HI(val), GET_LO(val));
+		printf("\n");
 		
 		printf ("Asc: %s\n", buf);
 
