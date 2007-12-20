@@ -112,10 +112,13 @@ int main(int argc, char **argv)
 		if (mode == MODE_DEC)
 		{
 			if (*p == '%')
+			{
 				mode = MODE_BIN;
+				p++;
+			}
 		}
 
-		while (*(++p))
+		do
 		{
 			if (mode == MODE_BIN)
 			{
@@ -142,6 +145,7 @@ int main(int argc, char **argv)
 				}
 			}
 		}
+		while (*(++p));
 
 		while (*p)
 			p++;
