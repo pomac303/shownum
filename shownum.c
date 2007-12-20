@@ -157,9 +157,12 @@ int main(int argc, char **argv)
 
 			if (p - argv[1] > 8)
 				p = argv[1] + 8;
-
+			
+			/* We cast to unsigned char since we don't want a "negative"
+			 * sentence or character.
+			 */
 			for (val = 0; p >= argv[1] && bit < 64; bit += 8)
-				val += ((uint64_t)*(--p) << bit);
+				val += ((uint64_t)*(unsigned char *)(--p) << bit);
 		}
 		else if (mode == MODE_BIN)
 		{
