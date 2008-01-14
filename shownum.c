@@ -1,14 +1,15 @@
 /*
- * shownum
- * -------
- * Copyright 2005-2006 by David Gerber <dg@zapek.com>
- * Copyright 2005-2007 by Ian Kumlien <pomac@vapor.com>
- * A reimplementation of Oliver Wagner's shownum
- * because he lost the source.
+ * shownum 2
+ * ---------
+ * Copyright 2008 by Ian Kumlien <pomac@vapor.com>
+ *
+ * A reimplementation of Oliver Wagner's shownum because he lost the source.
+ * A reimplementation of David Gerber's shownum since it was hard to maintain.
  *
  */
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 
 #if !defined(_MSC_VER)
 /*
@@ -33,7 +34,7 @@ typedef unsigned long long uint64_t;
 #define PRIx64 "llx"
 #define PRId64 "lld"
 #define PRIo64 "llo"
-#endif	/* !(defined(_INTTYPES_H) || defined(_INTTYPES_H_)) */
+#endif    /* !(defined(_INTTYPES_H) || defined(_INTTYPES_H_)) */
 
 #else
 /*
@@ -50,228 +51,412 @@ typedef unsigned __int64 uint64_t;
 
 #endif /* !defined(_MSC_VER) */
 
-#define VERSION "1.7"
+#define VERSION "0.1"
 
 #define FALSE 0
 #define TRUE 1
 
-#define GET_HI(x)	(((x) & (uint64_t)0xffffffff00000000) >> 32)
-#define GET_LO(x)	((x) & (uint64_t)0x00000000ffffffff)
+#define GET_HI(x)   ((x) >> 32)
+#define GET_LO(x)   ((x) & (uint64_t)0x00000000ffffffffLL)
+
+struct _parse_data_t;
+
+typedef int (*parse_func_t)(unsigned char p, struct _parse_data_t *data);
+
+typedef struct _parse_data_t
+{
+	parse_func_t parse;
+	uint64_t value;
+	int offset;
+	int handle_neg;
+	char name[15];
+} parse_data_t;
+
+static int parse_dec (unsigned char p, parse_data_t *data);
+static int parse_hex (unsigned char p, parse_data_t *data);
+static int parse_chr (unsigned char p, parse_data_t *data);
+static int parse_bin (unsigned char p, parse_data_t *data);
+static int parse_oct (unsigned char p, parse_data_t *data);
+
+#if 0
+#define DEBUG(x, y) printf("[DEBUG] %s name: %s value: %c\n", __FUNCTION__, (y), (x))
+#else
+#define DEBUG(x, y);
+#endif
+
+static int
+parse_dec (unsigned char p, parse_data_t *data)
+{
+	DEBUG(p, data->name);
+	if (isdigit(p))
+	{
+		data->value += (p - '0') * data->offset;
+		data->offset *= 10;
+
+		return 1;
+	}
+	else
+		return 0;
+}
+
+static int
+parse_hex (unsigned char p, parse_data_t *data)
+{
+	DEBUG(p, data->name);
+
+	/* Hex can have a 0x prefix */
+	switch (p)
+	{
+		case 'x':
+			data->offset = ~0;
+			return 1;
+		case '0':
+			if (data->offset == ~0)
+				return 1;
+	}
+
+	if (isalnum(p) && toupper(p) < 'G' && data->offset != ~0)
+	{
+		data->value += (isdigit(p) ? (p - '0') : (toupper(p) - ('A' - 10))) << data->offset;
+		data->offset += 4;
+
+		return 1;
+	}
+	else
+		return 0;
+}
+
+static int
+parse_chr (unsigned char p, parse_data_t *data)
+{
+	DEBUG(p, data->name);
+
+	/* Chars can be prefixed or suffixed by ' or " */
+	switch (p)
+	{
+		case '\"':
+		case '\'':
+			return 1;
+	}
+	if (data->offset < 64)
+	{
+		data->value += ((uint64_t)p) << data->offset;
+		data->offset += 8;
+	}
+	return 1;
+}
+
+static int
+parse_bin (unsigned char p, parse_data_t *data)
+{
+	DEBUG(p, data->name);
+	
+	/* Binary data can be prefixed with % */
+	if (p == '%')
+		return 1;
+	if (p == '0' || p == '1')
+	{
+		data->value += (p - '0') << data->offset;
+		data->offset += 1;
+
+		return 1;
+	}
+	else
+		return 0;
+}
+
+static int
+parse_oct (unsigned char p, parse_data_t *data)
+{
+	DEBUG(p, data->name);
+	(void)p;
+	(void)data;
+	return 0;
+}
 
 static const char usage_information[] = {
-	"shownum " VERSION " - http://zapek.com/software/shownum/\n\n"
+	"shownum2 " VERSION " - http://pomac.netswarm.net/misc/\n\n"
 	"usage: shownum <val>\n"
 	"where val is one of:\n"
 	" - decimal (eg. 5)\n"
 	" - hexadecimal (eg. 0x5)\n"
-	" - ansi chars, 8 max (eg. foo)\n"
-	" - binary, 64-bits max (eg. %%1101)\n"
-	"negative numbers work too\n"
+	" - ascii chars, 8 max (eg. foo)\n"
+	" - binary, 64-bits max (eg. 1101)\n"
+	"negative numbers work too\n\n"
+	"The result will be presented in all possible\n"
+	"interpretations of the entered data.\n"
 };
 
-typedef enum {
-	MODE_DEC,
-	MODE_HEX,
-	MODE_BIN,
-	MODE_ASCII
-} mode_t;
+#ifdef TEST_PARSERS
 
-int main(int argc, char **argv)
+int
+main (void)
 {
-	if (argc == 2)
+
+	/* MAKE4 - used for verification... */
+#define MAKE4(a, b, c, d) (((a) << 24) | ((b) << 16) | ((c) << 8) | (d))
+
+	/* Some very, and i do mean VERY basic verification... */
+
+	printf ("[testing] Testing all functions\n");
+	/* Decimal */
 	{
-		mode_t mode	= MODE_DEC;
-		int	neg		= FALSE,
-			no_bytes	= 0,
-			index	= 0;
-		uint64_t val = 0, bit = 0;
-
-		char	buf[65], *p = argv[1];
-
-		/*
-		 * Check for negative numbers.
-		 */
-		if (*p == '-')
-		{
-			neg = TRUE;
-			p++;
-		}
-
-		/*
-		 * Check for a possible hex value.
-		 */
-		if (*p == '0' && *(p + 1) == 'x')
-		{
-			mode = MODE_HEX;
-			p++;
-		}
-
-		/*
-		 * Check if this is binary.
-		 */
-		if (mode == MODE_DEC)
-		{
-			if (*p == '%')
-			{
-				mode = MODE_BIN;
-				p++;
-			}
-		}
-
-		do
-		{
-			if (mode == MODE_BIN)
-			{
-				if (!(*p == '1' || *p == '0'))
-				{
-					mode = MODE_ASCII;
-					break;
-				}
-			}
-			else if (mode == MODE_HEX)
-			{
-				if (!isxdigit(*p))
-				{
-					mode = MODE_ASCII;
-					break;
-				}
-			}
-			else
-			{
-				if (!isdigit(*p))
-				{
-					mode = MODE_ASCII;
-					break;
-				}
-			}
-		}
-		while (*(++p));
-
-		while (*p)
-			p++;
-
-		/*
-		 * Now do the conversion.
-		 */
-		if (mode == MODE_HEX)
-			(void)sscanf(argv[1], "%"PRIx64, &val);
-		else if (mode == MODE_ASCII)
-		{
-			bit = 0;
-
-			if (p - argv[1] > 8)
-				p = argv[1] + 8;
-			
-			/* We cast to unsigned char since we don't want a "negative"
-			 * sentence or character.
-			 */
-			for (val = 0; p >= argv[1] && bit < 64; bit += 8)
-				val += ((uint64_t)*(unsigned char *)(--p) << bit);
-		}
-		else if (mode == MODE_BIN)
-		{
-			register char chr = 0;
-
-			if (p - argv[1] > 64)
-				p = argv[1] + 64;
-
-			bit = 1;
-			val = 0;
-
-			while ((chr = *(--p)))
-			{
-				if (chr == '%')
-					break;
-				else if (chr == '1')
-					val |= bit;
-
-				bit <<= 1;
-			}
-
-			if (neg)
-				val = ~val;
-		}
-		else
-			(void)sscanf(argv[1], "%"PRIu64, &val);
-
-		/*
-		 * How many bytes of information do we have?
-		 */
-		for (index = 56; index > -1; index -= 8)
-		{
-			if (no_bytes || (((uint64_t)0xff << index) & val) >> index)
-				no_bytes++;
-		}
-		/* We need atleast one byte (return zeroed data */
-		if (!no_bytes)
-			no_bytes++;
-
-		/*
-		 * Extract any printable characters (US ASCII)
-		 */
-		for (p = buf, index = (no_bytes -1) << 3; index > -1; index -= 8, p++)
-		{
-			if (!isprint((*p = (char)((((uint64_t)0xff << index) & val) >> index))))
-				*p = '.';
-			if (index == 32)
-			{
-				*(++p) = ' ';
-				*(++p) = '|';
-				*(++p) = ' ';
-			}
-		}
-		*p++ = 0;
-
-		printf(	"Number of bits used: %i (%i bytes)\n"
-				"Dec: %-22"PRIu64, no_bytes << 3, no_bytes, val);
-		if (GET_HI(val))
-			printf( " --- hi: %-11"PRIu64" lo: %"PRIu64, GET_HI(val), GET_LO(val));
-		printf("\n");
-
-		printf(	"Hex: 0x%-20"PRIx64, val);
-		if (GET_HI(val))
-			printf(	" --- hi: 0x%-9"PRIx64" lo: 0x%"PRIx64, GET_HI(val), GET_LO(val));
-		printf("\n");
-
-		printf(	"Oct: %-22"PRIo64, val);
-		if (GET_HI(val))
-			printf(	" --- hi: %-11"PRIo64" lo: %"PRIo64, GET_HI(val), GET_LO(val));
-		printf("\n");
+		char in_data[] = "1234";
+		int index = 0;
+		parse_data_t data = {parse_dec, 0, 1, 1, "Decimal"};
 		
-		printf ("Asc: %s\n", buf);
+		printf ("[test] Decimal... ");
 
-		/*
-		 * Extract the actual bit pattern
-		 */
-		index = no_bytes << 3;
-		bit = (uint64_t)1 << (index -1);
-		for (p = buf, index = 64 - index; index < 64; index++)
+		for (index = sizeof(in_data) - 2; index >= 0; index--)
 		{
-			*p++ = (val & bit) ? '1' : '0';
-			bit >>= 1;
+			data.parse(in_data[index], &data);
+		}
+		if (data.value != 1234)
+			return 1;
+		printf ("[done]\n");
+	}
 
-			if (index == 31)
+	/* Hexadecimal */
+	{
+		char in_data[] = "0xf00f";
+		int index = 0;
+		parse_data_t data = {parse_hex, 0, 0, 1, "Hexadecimal"};
+
+		printf ("[test] Hexadecimal... ");
+
+		for (index = sizeof(in_data) - 2; index >= 0; index--)
+		{
+			data.parse(in_data[index], &data);
+		}
+		if (data.value != 0xf00f)
+			return 1;
+		printf ("[done]\n");
+	}
+
+	/* Character */
+	{
+		char in_data[] = "PING";
+		int index = 0;
+		parse_data_t data = {parse_chr, 0, 0, 0, "Character"};
+
+		printf ("[test] Character... ");
+
+		for (index = sizeof(in_data) - 2; index >= 0; index--)
+		{
+			data.parse(in_data[index], &data);
+		}
+		if (data.value != MAKE4('P', 'I', 'N', 'G'))
+			return 1;
+		printf ("[done]\n");
+	}
+
+	/* Binary */
+	{
+		char in_data[] = "1101\0";
+		int index = 0;
+		parse_data_t data = {parse_bin, 0, 0, 1, "Binary"};
+
+		printf ("[test] Binary... ");
+
+		for (index = sizeof(in_data) - 2; index >= 0; index--)
+		{
+			data.parse(in_data[index], &data);
+		}
+		if (data.value != 13)
+			return 1;
+		printf ("[done]\n");
+	}
+	(void)parse_oct;
+
+#undef MAKE4
+
+	return 0;
+}
+
+#else /* TEST_PARSERS */
+int
+main (int argc, char **argv)
+{
+	unsigned int index = 0, is_negative = 0;
+	int negative = 0;
+	char *last = NULL, *first = NULL;
+
+	parse_data_t data[] = {
+		{parse_dec, 0, 1, 1, "Decimal"},	/* The offset value has to be 1 here or all mults will fail! */
+		{parse_hex, 0, 0, 1, "Hexadecimal"},
+		{parse_chr, 0, 0, 0, "Character"},	/* Wants the negation sign as a actual character */
+		{parse_bin, 0, 0, 1, "Binary"},
+		{parse_oct, 0, 0, 1, "Octal"},	/* Anyone that actually uses this? */
+	};
+	last = first = argv[1];
+
+	if (argc < 2)
+	{
+		printf (usage_information);
+		return 1;
+	}
+
+	/* Find the terminating zero */
+	for (; *last; last++); 
+	last--;
+
+	/* Find any negation marks */
+	for (; *(first + negative) == '-'; negative++);
+
+	/* Is there a uneven amount? */
+	if (negative % 2)
+		is_negative++;
+
+	/* Parse the data */
+	for (; first <= last; last--)
+	{
+		register char p = *(char *)last;
+		for (index = 0; index < (sizeof(data)/sizeof(parse_data_t)); index++)
+		{
+			if (data[index].parse != 0)
 			{
-				*p++ = ' ';
-				*p++ = '|';
-				*p++ = ' ';
+				/* If this value can have negative values then we don't want to 
+				 * actually parse the negation marks */
+				if (data[index].handle_neg && (first + negative) > last)
+					continue;
+				if (data[index].parse(p, &data[index]) == 0)
+					data[index].parse = 0;
 			}
 		}
-		*p = '\0';
-
-		printf("Bin: %s\n     ", buf);
-		for (index = no_bytes; index; index--)
-		{
-			printf ("^---+---");
-			if (index == 5)
-				printf ("   ");
-
-		}
-		printf("\n");
 	}
-	else
-		printf(usage_information);
 
-	return (0);
+	/* Did we actually parse any data? */
+	{
+		int error_count = 0;
+
+		for (index = 0; index < sizeof(data)/sizeof(parse_data_t); index++)
+		{
+			if (data[index].parse == 0)
+				error_count++;
+		}
+
+		if (error_count == sizeof(data)/sizeof(parse_data_t))
+		{
+			printf (usage_information);
+			return 1;
+		}
+	}
+
+	for (index = 0; index < (sizeof(data)/sizeof(parse_data_t)); index++)
+	{
+		unsigned int no_bytes = 1, high = 0;
+
+		/* If parse is 0, then we know that the parse failed,
+		 * so we'll skip this part all together... */
+		if (data[index].parse == 0)
+			continue;
+
+		/* Negate the value if needed */
+		if (is_negative && data[index].handle_neg)
+			data[index].value = ~(data[index].value >> 1);
+
+		/* How many bytes of data do we have? */
+		{
+			uint64_t value = 0;
+
+			/* 64 bit or 32 bit? */
+			if ((value = GET_HI(data[index].value)))
+				high = 1;
+			else
+				value = GET_LO(data[index].value);
+
+			/* Binary search for the highest byte with a value */
+			if (value & 0xffff0000)
+			{
+				if ((value & 0xff000000) == 0)
+					no_bytes = 3;
+				else
+					no_bytes = 4;
+			}
+			else if (value & 0x0000ff00)
+				no_bytes = 2;
+
+			if (high)
+				no_bytes += 4;
+		}
+
+		printf ("When input is parsed as: %s\nNumber of bits used: %i (%i bytes)\n", 
+			data[index].name, no_bytes << 3, no_bytes);
+
+		/* Decimal */
+		printf ("Dec: %-22"PRIu64, data[index].value);
+		if (high)
+			printf (" --- hi: %-11"PRIu64" lo: %"PRIu64, GET_HI(data[index].value), GET_LO(data[index].value));
+		printf ("\n");
+
+		/* Hexadecimal */
+		printf ("Hex: 0x%-20"PRIx64, data[index].value);
+		if (high)
+			printf (" --- hi: 0x%-9"PRIx64" lo: 0x%"PRIx64, GET_HI(data[index].value), GET_LO(data[index].value));
+		printf ("\n");
+
+		/* Octal */
+		printf ("Oct: %-22"PRIo64, data[index].value);
+		if (high)
+			printf (" --- hi: %-11"PRIo64" lo: %"PRIo64, GET_HI(data[index].value), GET_LO(data[index].value));
+		printf ("\n");
+
+		/* Ascii */
+		{
+			char *tmp = NULL, buffer[65] = {0};
+			int idx = 0;
+
+			for (tmp = buffer, idx = (no_bytes -1) << 3; idx > -1; idx -= 8, tmp++)
+			{
+				if (!isprint(*tmp = (((((uint64_t)0xff << idx)) & data[index].value) >> idx)))
+					*tmp = '.';
+				if (idx == 32)
+				{
+					*(++tmp) = ' ';
+					*(++tmp) = '|';
+					*(++tmp) = ' ';
+				}
+			}
+			printf ("Asc: %s\n", buffer);
+		}
+
+		/* Binary */
+		{
+			char *tmp = NULL, buffer[70] = {0};
+			int idx = no_bytes << 3;
+			uint64_t bit = (uint64_t)1 << (idx - 1);
+
+			for (tmp = buffer, idx = 64 - idx; idx < 64; idx++)
+			{
+				*tmp++ = (data[index].value & bit) ? '1' : '0';
+				bit >>= 1;
+
+				if (idx == 31)
+				{
+					*tmp++ = ' ';
+					*tmp++ = '|';
+					*tmp++ = ' ';
+				}
+			}
+			printf ("Bin: %s\n", buffer);
+		}
+		
+		/* Ruler */
+		{
+			int nibble = 0;
+
+			printf ("     ");
+			for (nibble = no_bytes; nibble; nibble--)
+			{
+				printf ("^---+---");
+				
+				if (nibble == 5)
+					printf ("   ");
+			}
+			printf ("\n\n");
+		}
+	}
+	return 0;
 }
+#endif /* TESTED_PARSERS */
 

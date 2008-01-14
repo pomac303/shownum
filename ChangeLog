@@ -24,3 +24,5 @@ version 1.7
 			not ansi.
 		* Added MSVC C99 compability from JC
 
+version 2.0
+	Complete rewrite by Ian Kumlien
