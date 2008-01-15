@@ -57,7 +57,7 @@ typedef unsigned __int64 uint64_t;
 #define TRUE 1
 
 #define GET_HI(x)   ((x) >> 32)
-#define GET_LO(x)   ((x) & (uint64_t)0x00000000ffffffffLL)
+#define GET_LO(x)   ((x) & (uint64_t)0x00000000ffffffff)
 
 /* Endian, -le -be
  * --dec, --hex, --chr, --bin
