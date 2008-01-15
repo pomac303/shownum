@@ -51,13 +51,24 @@ typedef unsigned __int64 uint64_t;
 
 #endif /* !defined(_MSC_VER) */
 
-#define VERSION "0.1"
+#define VERSION "2.0"
 
 #define FALSE 0
 #define TRUE 1
 
 #define GET_HI(x)   ((x) >> 32)
 #define GET_LO(x)   ((x) & (uint64_t)0x00000000ffffffffLL)
+
+/* Endian, -le -be
+ * --dec, --hex, --chr, --bin
+ *  -d -h -c -b
+ */
+
+typedef enum
+{
+	ENDIAN_BIG,
+	ENDIAN_LITTLE
+} endian_t;
 
 struct _parse_data_t;
 
@@ -175,20 +186,28 @@ parse_oct (unsigned char p, parse_data_t *data)
 }
 
 static const char usage_information[] = {
-	"shownum2 " VERSION " - http://pomac.netswarm.net/misc/\n\n"
+	"shownum " VERSION " - http://pomac.netswarm.net/misc/\n\n"
 	"usage: shownum <val>\n"
 	"where val is one of:\n"
 	" - decimal (eg. 5)\n"
 	" - hexadecimal (eg. 0x5)\n"
 	" - ascii chars, 8 max (eg. foo)\n"
 	" - binary, 64-bits max (eg. 1101)\n"
-	"negative numbers work too\n\n"
-	"The result will be presented in all possible\n"
+	"negative numbers work too\n"
+	"\noptions:\n"
+	" -a -- display all matches\n"
+	"\n  endianess (input or output):\n"
+	"   -le -- little endian\n"
+	"   -be -- big endian (default)\n"
+	"\nThe result will be presented in all possible\n"
 	"interpretations of the entered data.\n"
 };
 
 #ifdef TEST_PARSERS
 
+/* ***************************** *
+ * * TEST * TEST * TEST * TEST * *
+ * ***************************** */
 int
 main (void)
 {
@@ -272,13 +291,17 @@ main (void)
 
 	return 0;
 }
+/* ***************************** *
+ * * TEST * TEST * TEST * TEST * *
+ * ***************************** */
 
 #else /* TEST_PARSERS */
+
 int
 main (int argc, char **argv)
 {
-	unsigned int index = 0, is_negative = 0;
-	int negative = 0;
+	unsigned int index = 0, is_negative = 0, match_all = 0, has_displayed = 0;
+	int negative = 0, endian = 0;
 	char *last = NULL, *first = NULL;
 
 	parse_data_t data[] = {
@@ -288,12 +311,51 @@ main (int argc, char **argv)
 		{parse_bin, 0, 0, 1, "Binary"},
 		{parse_oct, 0, 0, 1, "Octal"},	/* Anyone that actually uses this? */
 	};
-	last = first = argv[1];
 
+	/* No options, no input data */
 	if (argc < 2)
 	{
 		printf (usage_information);
 		return 1;
+	}
+
+	last = first = argv[argc - 1];
+
+	/* Handle options */
+	if (argc > 2)
+	{
+		argc--; /* Avoid the acutual data */
+
+		for (index = 0; (signed int)index < argc; index++)
+		{
+			char *tmp = argv[index];
+			while (*tmp)
+			{
+				switch (*tmp)
+				{
+					case '-':
+						break;
+					case 'l':
+						if (*(tmp + 1) == 'e')
+						{
+							endian = ENDIAN_LITTLE;
+							tmp++;
+						}
+						break;
+					case 'b':
+						if (*(tmp + 1) == 'e')
+						{
+							endian = ENDIAN_BIG;
+							tmp++;
+						}
+						break;
+					case 'a':
+						match_all = 1;
+						break;
+				}
+				tmp++;
+			}
+		}
 	}
 
 	/* Find the terminating zero */
@@ -350,10 +412,8 @@ main (int argc, char **argv)
 		 * so we'll skip this part all together... */
 		if (data[index].parse == 0)
 			continue;
-
-		/* Negate the value if needed */
-		if (is_negative && data[index].handle_neg)
-			data[index].value = ~(data[index].value >> 1);
+		if (has_displayed++ && match_all == 0)
+			break;
 
 		/* How many bytes of data do we have? */
 		{
@@ -378,6 +438,42 @@ main (int argc, char **argv)
 
 			if (high)
 				no_bytes += 4;
+		}
+
+		/* Change endianess? */
+		switch (endian)
+		{
+			case ENDIAN_LITTLE:
+			{
+				unsigned char *bytes = (unsigned char *)&data[index].value;
+				uint64_t value = 0;
+				int offset = -16; /* Initial bit shift should be zero, tus we have to set a negative value here */
+
+				/* We need a even value */
+				if (no_bytes % 2 != 0)
+					no_bytes++;
+
+				/* Since we have a even value we can process two bytes at a time. */
+				switch (no_bytes)
+				{
+					case 8: 	value |= 	(((uint64_t)bytes[7] | ((uint64_t)bytes[6] << 8)) << (offset += 16));
+					case 6:	value |= 	(((uint64_t)bytes[5] | ((uint64_t)bytes[4] << 8)) << (offset += 16));
+					case 4:	value |= 	(((uint64_t)bytes[3] | ((uint64_t)bytes[2] << 8)) << (offset += 16));
+					case 2:	value |=	(((uint64_t)bytes[1] | ((uint64_t)bytes[0] << 8)) << (offset += 16));
+				}
+				data[index].value = value;
+				break;
+			}
+			default:
+				break;
+		}
+
+		/* Negate the value if needed, we also limit the size of the new value
+		 * so we don't get 64bit negative values for a common value */
+		if (is_negative && data[index].handle_neg)
+		{
+			data[index].value *= (-1);
+			data[index].value &= ((uint64_t)(-1) >> (64 - (no_bytes << 3)));
 		}
 
 		printf ("When input is parsed as: %s\nNumber of bits used: %i (%i bytes)\n", 
