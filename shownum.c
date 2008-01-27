@@ -397,7 +397,7 @@ main (void)
 			{
 				{ "1234", 1234 }, 
 				{ "4294967295", 4294967295 }, 
-				{ "18446744073709551614", 18446744073709551614LU },
+				{ "18446744073709551615", 0xffffffffffffffff },
 			},
 		},
 		{
@@ -445,7 +445,10 @@ main (void)
 				data.parse(*last--, &data);
 
 			if (data.value != test_data[top_level].values[entry].value)
+			{
+				printf("Error comparing %"PRIu64" to %"PRIu64"\n", data.value, test_data[top_level].values[entry].value);
 				return 1;
+			}
 
 			printf ("\033[A  * (%u/%u) %s...\n", entry + 1, 
 				(unsigned int)(sizeof(test_data[top_level].values)/sizeof(test_data[top_level].values[0])), data.name);
