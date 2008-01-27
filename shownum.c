@@ -24,6 +24,7 @@
  */
 #if !(defined(_STDINT_H) || defined(_STDINT_H_))
 typedef unsigned long long uint64_t;
+typedef signed   long long int64_t;
 #endif
 
 /*
@@ -43,6 +44,7 @@ typedef unsigned long long uint64_t;
  */
 
 typedef unsigned __int64 uint64_t;
+typedef   signed __int64 int64_t;
 
 #define PRIu64 "I64u"
 #define PRIx64 "I64x"
@@ -87,7 +89,6 @@ static int parse_dec (unsigned char p, parse_data_t *data);
 static int parse_hex (unsigned char p, parse_data_t *data);
 static int parse_chr (unsigned char p, parse_data_t *data);
 static int parse_bin (unsigned char p, parse_data_t *data);
-static int parse_oct (unsigned char p, parse_data_t *data);
 
 #if 0
 #define DEBUG(x, y) printf("[DEBUG] %s name: %s value: %c\n", __FUNCTION__, (y), (x))
@@ -99,7 +100,7 @@ static int parse_oct (unsigned char p, parse_data_t *data);
  * Parse functions
  * ========================================================================= */
 
-static inline int
+static int
 parse_dec (unsigned char p, parse_data_t *data)
 {
 	DEBUG(p, data->name);
@@ -124,7 +125,7 @@ parse_dec (unsigned char p, parse_data_t *data)
 		return 0;
 }
 
-static inline int
+static int
 parse_hex (unsigned char p, parse_data_t *data)
 {
 	DEBUG(p, data->name);
@@ -157,7 +158,7 @@ parse_hex (unsigned char p, parse_data_t *data)
 		return 0;
 }
 
-static inline int
+static int
 parse_chr (unsigned char p, parse_data_t *data)
 {
 	DEBUG(p, data->name);
@@ -177,7 +178,7 @@ parse_chr (unsigned char p, parse_data_t *data)
 	return 1;
 }
 
-static inline int
+static int
 parse_bin (unsigned char p, parse_data_t *data)
 {
 	DEBUG(p, data->name);
@@ -200,20 +201,11 @@ parse_bin (unsigned char p, parse_data_t *data)
 	}
 }
 
-static inline int
-parse_oct (unsigned char p, parse_data_t *data)
-{
-	DEBUG(p, data->name);
-	(void)p;
-	(void)data;
-	return 0;
-}
-
 /* =========================================================================
  * Helper functions
  * ========================================================================= */
 
-static inline unsigned int
+static unsigned int
 get_no_bytes(const parse_data_t * const data)
 {
 	uint64_t value = data->is_negative ? data->value * -1 : data->value;
@@ -243,7 +235,7 @@ get_no_bytes(const parse_data_t * const data)
 	return no_bytes;
 }
 
-static inline unsigned int
+static unsigned int
 switch_endian(parse_data_t *data, endian_t endian)
 {
 	unsigned int no_bytes = get_no_bytes(data);
@@ -309,7 +301,7 @@ static const char const usage_information[] = {
  * Output functions
  * ========================================================================= */
 
-static inline void
+static void
 print_ascii(const parse_data_t * const data, const unsigned int no_bytes)
 {
 	char *tmp = NULL, buffer[65] = {'\0'};
@@ -329,7 +321,7 @@ print_ascii(const parse_data_t * const data, const unsigned int no_bytes)
 	printf ("Asc: %s\n", buffer);
 }
 
-static inline void
+static void
 print_binary(const parse_data_t * const data, const unsigned int no_bytes)
 {
 	char *tmp = NULL, buffer[70] = {'\0'};
@@ -351,7 +343,7 @@ print_binary(const parse_data_t * const data, const unsigned int no_bytes)
 	printf ("Bin: %s\n", buffer);
 }
 
-static inline void
+static void
 print_ruler(const unsigned int no_bytes)
 {
 	int nibble = 0;
@@ -474,7 +466,6 @@ main (int argc, char **argv)
 		{parse_dec, 0, 1, 0, "Decimal"},	/* The offset value has to be 1 here or all mults will fail! */
 		{parse_hex, 0, 0, 0, "Hexadecimal"},
 		{parse_bin, 0, 0, 0, "Binary"},
-		{parse_oct, 0, 0, 0, "Octal"},	/* Anyone that actually uses this? */
 		{parse_chr, 0, 0, 0, "Character"},	/* Wants the negation sign as a actual character */
 	};
 

@@ -7,7 +7,7 @@ CFLAGS = -O2 -Wall -Wno-parentheses -Wno-switch -Wstrict-prototypes \
 # -initallelements  => splint doesn't know about = {0}
 # -mustfreeonly     => we don't allocate any memory, it's all on stack.
 SFLAGS = +matchanyintegral -initallelements -mustfreeonly \
-	-predboolint -noeffect -formatconst -formatcode +quiet
+	-predboolint -formatconst -formatcode +quiet
 
 all: shownum
 
