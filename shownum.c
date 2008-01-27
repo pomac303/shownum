@@ -289,7 +289,8 @@ switch_endian(parse_data_t *data, endian_t endian)
  * ========================================================================= */
 
 static const char const usage_information[] = {
-	"shownum " VERSION " - http://pomac.netswarm.net/misc/\n\n"
+	"shownum " VERSION " - http://zapek.com/?page_id=17\n"
+	"            | http://pomac.netswarm.net/misc/\n\n"
 	"usage: shownum <val>\n"
 	"where val is one of:\n"
 	" - decimal (eg. 5)\n"
@@ -299,11 +300,9 @@ static const char const usage_information[] = {
 	"negative numbers work too\n"
 	"\noptions:\n"
 	" -a -- display all matches\n"
-	"\n  endianess (input or output):\n"
-	"   -le -- little endian\n"
-	"   -be -- big endian (default)\n"
-	"\nThe result will be presented in all possible\n"
-	"interpretations of the entered data.\n"
+	"\nendianess:\n"
+	" -le -- little endian\n"
+	" -be -- big endian (default)\n"
 };
 
 /* =========================================================================
