@@ -80,7 +80,7 @@ typedef struct _parse_data_t
 {
 	parse_func_t parse;		/**< a pointer to a parser function */
 	uint64_t value;		/**< where we save the parsed values */
-	int64_t offset; 		/**< here we store any kind of additional state we need while parsing */
+	uint64_t state; 		/**< here we store any kind of additional state we need while parsing */
 	int is_negative;		/**< here we store if we have read a negative value or not */
 	char name[15];			/**< the name of the type of value we are parsing */
 } parse_data_t;
@@ -121,8 +121,7 @@ parse_dec (unsigned char p, parse_data_t *data)
 
 	if (isdigit(p))
 	{
-		data->value += (uint64_t)(p - (unsigned char)'0') * data->offset;
-		data->offset *= 10;
+		data->value = (data->value * 10) + (int)(p - (unsigned char)'0');
 
 		return 1;
 	}
@@ -140,32 +139,42 @@ parse_hex (unsigned char p, parse_data_t *data)
 {
 	DEBUG(p, data->name);
 
-	/* Hex can have a 0x prefix */
-	switch (p)
+	/* Hex must have a 0x prefix */
+	
+	if (data->state != (typeof(data->state))~0)
 	{
-		case '-':
-			data->value *= -1;
-			data->is_negative ^= 1;
-			/*@fallthrough@*/
-		case '+':
-		case 'x':
-			data->offset = ~0;
-			return 1;
-	}
+		char t;
+		int val;
 
-	if (data->offset == ~0)
-		return 1;
+		if (data->state == 0)
+			data->state = '0' | (unsigned int)'x' << 8;
 
-	if (isalnum(p) && toupper(p) < (int)'G')
-	{
-		data->value += (uint64_t)(isdigit(p) ? (int)(p - (unsigned char)'0') : 
-			(toupper(p) - ((int)'A' - 10))) << (uint64_t)data->offset;
-		data->offset += 4;
-
-		return 1;
+		t = (char)data->state & 0xff;
+		val = data->state >> 8;
+		data->state = val ? val : ~0;
+		return (int)((char)tolower(p) == t);
 	}
 	else
-		return 0;
+	{
+		switch (p)
+		{
+			case '-':
+				data->value *= -1;
+				data->is_negative ^= 1;
+				/*@fallthrough@*/
+			case '+':
+				return 1;
+		}
+
+		if (isalnum(p) && toupper(p) < (int)'G')
+		{
+			data->value = (data->value << 4) + (isdigit(p) ? (int)(p - (unsigned char)'0') :
+				(toupper(p) - ((int)'A' - 10)));
+
+			return 1;
+		}
+	}
+	return 0;
 }
 
 /** Parse a character string to a integer value.
@@ -185,11 +194,7 @@ parse_chr (unsigned char p, parse_data_t *data)
 		case '\'':
 			return 1;
 	}
-	if (data->offset < 64)
-	{
-		data->value += ((uint64_t)p) << (uint64_t)data->offset;
-		data->offset += 8;
-	}
+	data->value = (data->value << 8) + (int)p;
 	return 1;
 }
 
@@ -207,8 +212,7 @@ parse_bin (unsigned char p, parse_data_t *data)
 	{
 		case '0':
 		case '1':
-			data->value += (uint64_t)(p - (unsigned char)'0') << (uint64_t)data->offset;
-			data->offset += 1;
+			data->value = (data->value << 1) + (int)(p - (unsigned char)'0');
 			/*@fallthrough@*/
 		case '%': /* Binary data can be prefixed with % */
 			return 1;
@@ -301,7 +305,7 @@ main (void)
 		},
 	};
 
-	char *first = NULL, *last = NULL;
+	char *value = NULL;
 	unsigned int entry = 0, top_level = 0;
 
 	for (; top_level < sizeof(test_data)/sizeof(test_data_t); top_level++)
@@ -312,12 +316,10 @@ main (void)
 		{
 			parse_data_t data = test_data[top_level].data;
 
-			first = last = test_data[top_level].values[entry].string;
-			for (; *last != '\0'; last++);
-			last--;
+			value = test_data[top_level].values[entry].string;
 
-			while (last >= first)
-				data.parse(*last--, &data);
+			while (*value)
+				data.parse(*value++, &data);
 
 			if (data.value != test_data[top_level].values[entry].value)
 			{
@@ -452,7 +454,7 @@ print_ascii(const parse_data_t * const data, const unsigned int no_bytes)
 
 	for (tmp = buffer, idx = (int)((no_bytes -1) << 3); idx > -1; idx -= 8, tmp++)
 	{
-		if (!isprint(*tmp = (char)(((((uint64_t)0xff << (unsigned int)idx)) & data->value) >> (unsigned int)idx)))
+		if (!isprint(*tmp = (char)((data->value >> (unsigned int)idx) & 0xff)))
 			*tmp = '.';
 		if (idx == 32)
 		{
@@ -523,7 +525,7 @@ int
 main (int argc, char **argv)
 {
 	unsigned int index = 0, match_all = 0, has_displayed = 0, endian = 0;
-	char *last = NULL, *first = NULL;
+	char *value = NULL;
 
 	parse_data_t data[] = {
 		{parse_dec, 0, 1, 0, "Decimal"},		/* set up the decimal parser, it needs a start offset of 1 */
@@ -539,7 +541,7 @@ main (int argc, char **argv)
 		return 1;
 	}
 
-	last = first = argv[argc - 1];
+	value = argv[argc - 1];
 
 	/* Handle options */
 	if (argc > 2)
@@ -578,14 +580,10 @@ main (int argc, char **argv)
 		}
 	}
 
-	/* Find the terminating zero */
-	for (; (unsigned int)*last; last++); 
-	last--;
-
 	/* Parse the data */
-	for (; first <= last; last--)
+	while((int)*value)
 	{
-		register unsigned char p = *(unsigned char *)last;
+		register unsigned char p = *(unsigned char *)value++;
 		for (index = 0; index < (sizeof(data)/sizeof(parse_data_t)); index++)
 		{
 			if (data[index].parse != NULL)
