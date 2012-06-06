@@ -1,1 +1,45 @@
-http://zapek.com/software/shownum/
+shownum is a simple tool that converts numbers.
+It was invented by Oliver Wagner back in the good old Amiga days and is 
+probably his greatest software ever. Since it’s faster to rewrite it from 
+scratch than looking for a replacement, here it is.
+
+Examples:
+zapek@bacterion:~$ shownum 666
+Number of bits used: 16 (2 bytes)
+Dec: 666
+Hex: 0x29a
+Oct: 1232
+Asc: ..
+Bin: 0000001010011010
+     ^---+---^---+---
+
+zapek@bacterion:~$ shownum 0x574d5633
+Number of bits used: 32 (4 bytes)
+Dec: 1464686131
+Hex: 0x574d5633
+Oct: 12723253063
+Asc: WMV3
+Bin: 01010111010011010101011000110011
+     ^---+---^---+---^---+---^---+---
+
+zapek@bacterion:~$ shownum -1
+Number of bits used: 64 (8 bytes)
+Dec: 18446744073709551615   --- hi: 4294967295  lo: 4294967295
+Hex: 0xffffffffffffffff     --- hi: 0xffffffff  lo: 0xffffffff
+Oct: 1777777777777777777777 --- hi: 37777777777 lo: 37777777777
+Asc: .... | ....
+Bin: 11111111111111111111111111111111 | 11111111111111111111111111111111
+     ^---+---^---+---^---+---^---+---   ^---+---^---+---^---+---^---+---
+
+zapek@bacterion:~$ shownum plop
+Number of bits used: 32 (4 bytes)
+Dec: 1886154608
+Hex: 0x706c6f70
+Oct: 16033067560
+Asc: plop
+Bin: 01110000011011000110111101110000
+     ^---+---^---+---^---+---^---+---
+
+Original url:
+http://zapek.com/?page_id=17
+
