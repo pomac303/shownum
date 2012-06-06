@@ -1,6 +1,6 @@
 CFLAGS = -O2 -Wall -Wno-parentheses -Wno-switch -Wstrict-prototypes \
 	-Werror-implicit-function-declaration -Wpointer-arith -Wmissing-prototypes \
-	-Wmissing-declarations -Wcomments -Wextra -Wall
+	-Wmissing-declarations -Wcomments -Wextra -Werror
 
 # Splint flags:
 # +matchanyintegral => we define our own types.
